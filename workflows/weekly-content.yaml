@@ -1,0 +1,64 @@
+name: weekly-content
+description: "Genera el plan de contenido del día: brief estratégico + caption + prompt visual"
+version: "1.0"
+
+# Punto de entrada: python -m src.main run weekly-content
+# Acepta override de fecha: python -m src.main run weekly-content --date 2026-04-10
+
+steps:
+  - id: cmo_brief
+    agent: cmo
+    action: generate_brief
+    description: "CMO genera el brief estratégico según el día de la semana"
+    inputs:
+      date: "{current_date}"
+      day_name: "{current_day_name}"
+    outputs:
+      - cmo_brief
+
+  - id: voice_content
+    agent: persona_engine
+    action: generate_voice
+    description: "Persona Engine genera el caption en la voz del personaje asignado"
+    depends_on:
+      - cmo_brief
+    inputs:
+      persona: "{cmo_brief.content.persona}"
+      brief: "{cmo_brief}"
+    outputs:
+      - voice_output
+    save_to: "outputs/content"
+
+  - id: visual_prompt
+    agent: persona_engine
+    action: generate_visual
+    description: "Persona Engine genera el master prompt de imagen via RAG sobre UGC/"
+    depends_on:
+      - cmo_brief
+    inputs:
+      persona: "{cmo_brief.content.persona}"
+      scene: "{cmo_brief.content.scene_brief}"
+      angle: "3/4"
+      framing: "portrait"
+    outputs:
+      - visual_output
+    save_to: "outputs/image-prompts"
+
+  - id: creative_brief
+    agent: cmo
+    action: generate_creative_brief
+    description: "CMO sintetiza el brief creativo final integrando voice + visual"
+    depends_on:
+      - voice_content
+      - visual_prompt
+    inputs:
+      voice_output: "{voice_output}"
+      visual_output: "{visual_output}"
+      cmo_brief: "{cmo_brief}"
+      date: "{current_date}"
+    outputs:
+      - creative_brief
+    save_to: "outputs/briefs"
+
+output_format: json
+human_review_required: true
